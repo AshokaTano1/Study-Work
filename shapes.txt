@@ -1,57 +1,18 @@
-from django.contrib import admin
-from .models import *
-import billiard as mp
+@admin.action(description="Экспортировать логи в CSV")
+def export_logs_to_csv(modeladmin, request, queryset):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="logs.csv"'
 
-class taskWorker(mp.Process):
-    def __init__(self, queryset):
-        super().__init__()
-        self.queryset = queryset
-        
-    def run(self):
-        for query in self.queryset:
-            copy_profile(query.userTo, query.userFrom)
+    writer = csv.writer(response)
+    writer.writerow(["user", "time", "text", "ip", "url"])  # Заголовки CSV
 
-@admin.action(description="Run selected tasks")
-def runSelected(modeladmin, request, queryset):
-    thread = taskWorker(queryset)
-    thread.start()
+    for log in queryset:
+        writer.writerow([
+            log.user.username if log.user else "Аноним",
+            log.time.strftime("%Y-%m-%d %H:%M:%S"),
+            log.text,
+            log.ip,
+            log.url,
+        ])
 
-class FolderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'user', 'inFolder', 'w', 'h', 'y', 'dashboardX')
-    list_display_links = ["id", "title"]
-    search_fields = ('id', 'title', 'user__username')
-    list_filter = ['user', 'inFolder']
-
-class LinkAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'user', 'inFolder',  'w', 'h', 'y', 'dashboardX')
-    list_display_links = ["id", "title"]
-    search_fields = ('title', 'inFolder__title', 'inFolder__id', 'user__username')
-    readonly_fields=('gateFileHash',)
-    list_filter = ['user', 'inFolder']
-    
-class LogsAdmin(admin.ModelAdmin):
-    list_filter = ["user", "ip"]
-    readonly_fields=('user','time', 'text', 'ip', 'url')
-
-    def has_add_permission(self, request, obj=None):
-            return False
-
-class AutoCopyAdmin(admin.ModelAdmin):
-    list_display = ('id', 'userTo',  'userFrom')
-    actions = [runSelected]
-    readonly_fields=('userTo', 'userFrom')
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
-        extra_context = extra_context or {}
-        extra_context['show_save_and_continue'] = False
-        extra_context['show_save'] = False
-        return super(AutoCopyAdmin, self).changeform_view(request, object_id, extra_context=extra_context)
-
-admin.site.register(AutoCopyTask, AutoCopyAdmin)
-admin.site.register(Folder, FolderAdmin)
-admin.site.register(Link, LinkAdmin)
-admin.site.register(UserSettings)
-admin.site.register(Logs, LogsAdmin)
+    return response
