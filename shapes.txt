@@ -1,18 +1,20 @@
-@admin.action(description="Экспортировать логи в CSV")
-def export_logs_to_csv(modeladmin, request, queryset):
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="logs.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow(["user", "time", "text", "ip", "url"])  # Заголовки CSV
-
-    for log in queryset:
-        writer.writerow([
-            log.user.username if log.user else "Аноним",
-            log.time.strftime("%Y-%m-%d %H:%M:%S"),
-            log.text,
-            log.ip,
-            log.url,
-        ])
-
-    return response
+NameError at /admin/plitki/logs/
+name 'HttpResponse' is not defined
+Request Method:	POST
+Request URL:	http://localhost:8001/admin/plitki/logs/
+Django Version:	5.1.2
+Exception Type:	NameError
+Exception Value:	
+name 'HttpResponse' is not defined
+Exception Location:	/plitki-backend/app/plitki/admin.py, line 21, in export_logs_to_csv
+Raised during:	django.contrib.admin.options.changelist_view
+Python Executable:	/opt/venv/bin/python
+Python Version:	3.12.3
+Python Path:	
+['/plitki-backend/app',
+ '/plitki-backend/app',
+ '/usr/lib/python312.zip',
+ '/usr/lib/python3.12',
+ '/usr/lib/python3.12/lib-dynload',
+ '/opt/venv/lib/python3.12/site-packages']
+Server time:	Wed, 05 Mar 2025 06:58:43 +0000
