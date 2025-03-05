@@ -1,4 +1,57 @@
-Point(3.4, 5.5)
-Line(Point(1.2, 3.4), Point(5, 6))
-Circle(Point(5, 6), 7)
-Point(2, 2)
+from django.contrib import admin
+from .models import *
+import billiard as mp
+
+class taskWorker(mp.Process):
+    def __init__(self, queryset):
+        super().__init__()
+        self.queryset = queryset
+        
+    def run(self):
+        for query in self.queryset:
+            copy_profile(query.userTo, query.userFrom)
+
+@admin.action(description="Run selected tasks")
+def runSelected(modeladmin, request, queryset):
+    thread = taskWorker(queryset)
+    thread.start()
+
+class FolderAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'user', 'inFolder', 'w', 'h', 'y', 'dashboardX')
+    list_display_links = ["id", "title"]
+    search_fields = ('id', 'title', 'user__username')
+    list_filter = ['user', 'inFolder']
+
+class LinkAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'user', 'inFolder',  'w', 'h', 'y', 'dashboardX')
+    list_display_links = ["id", "title"]
+    search_fields = ('title', 'inFolder__title', 'inFolder__id', 'user__username')
+    readonly_fields=('gateFileHash',)
+    list_filter = ['user', 'inFolder']
+    
+class LogsAdmin(admin.ModelAdmin):
+    list_filter = ["user", "ip"]
+    readonly_fields=('user','time', 'text', 'ip', 'url')
+
+    def has_add_permission(self, request, obj=None):
+            return False
+
+class AutoCopyAdmin(admin.ModelAdmin):
+    list_display = ('id', 'userTo',  'userFrom')
+    actions = [runSelected]
+    readonly_fields=('userTo', 'userFrom')
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['show_save_and_continue'] = False
+        extra_context['show_save'] = False
+        return super(AutoCopyAdmin, self).changeform_view(request, object_id, extra_context=extra_context)
+
+admin.site.register(AutoCopyTask, AutoCopyAdmin)
+admin.site.register(Folder, FolderAdmin)
+admin.site.register(Link, LinkAdmin)
+admin.site.register(UserSettings)
+admin.site.register(Logs, LogsAdmin)
