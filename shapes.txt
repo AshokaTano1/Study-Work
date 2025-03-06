@@ -1,88 +1,16 @@
-from django.contrib import admin
-from .models import *  # Импорт всех моделей из текущего приложения
-import billiard as mp  # Используем billiard для многопроцессорности в Celery
-from django.http import HttpResponse
-import csv  # Импортируем модуль для работы с CSV
-
-# Класс для обработки фоновых задач с использованием процессов
-class taskWorker(mp.Process):
-    def __init__(self, queryset):
-        super().__init__()
-        self.queryset = queryset  # Сохраняем переданные объекты
-
-    def run(self):
-        for query in self.queryset:
-            copy_profile(query.userTo, query.userFrom)  # Вызываем функцию копирования профилей
-
-# Действие для запуска фоновой задачи копирования
-@admin.action(description="Run selected tasks")
-def runSelected(modeladmin, request, queryset):
-    thread = taskWorker(queryset)
-    thread.start()  # Запускаем новый процесс
-
-# Действие для экспорта логов в CSV
-@admin.action(description="Экспортировать логи в CSV")
-def export_logs_to_csv(modeladmin, request, queryset):
-    # Создаем HTTP-ответ с заголовком для скачивания файла
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="logs.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow(["user", "time", "text", "ip", "url"])  # Заголовки CSV
-
-    for log in queryset:
-        writer.writerow([
-            log.user.username if log.user else "Аноним",  # Проверяем наличие пользователя
-            log.time.strftime("%Y-%m-%d %H:%M:%S") if hasattr(log.time, "strftime") else log.time,  # Проверяем формат даты
-            log.text,
-            log.ip,
-            log.url,
-        ])
-
-    return response
-
-# Конфигурация отображения модели Folder в админке
-class FolderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'user', 'inFolder', 'w', 'h', 'y', 'dashboardX')
-    list_display_links = ["id", "title"]
-    search_fields = ('id', 'title', 'user__username')
-    list_filter = ['user', 'inFolder']
-
-# Конфигурация отображения модели Link в админке
-class LinkAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'user', 'inFolder',  'w', 'h', 'y', 'dashboardX')
-    list_display_links = ["id", "title"]
-    search_fields = ('title', 'inFolder__title', 'inFolder__id', 'user__username')
-    readonly_fields = ('gateFileHash',)
-    list_filter = ['user', 'inFolder']
-
-# Конфигурация модели Logs в админке
-class LogsAdmin(admin.ModelAdmin):
-    list_filter = ["user", "ip"]  # Фильтр по пользователю и IP
-    readonly_fields = ['user', 'time', 'text', 'ip', 'url']  # Запрещаем редактирование полей
-    actions = [export_logs_to_csv]  # Добавляем действие для экспорта в CSV
-
-    def has_add_permission(self, request, obj=None):
-        return False  # Запрещаем добавление новых записей вручную
-
-# Конфигурация модели AutoCopyTask в админке
-class AutoCopyAdmin(admin.ModelAdmin):
-    list_display = ('id', 'userTo', 'userFrom')
-    actions = [runSelected]  # Добавляем кастомное действие
-    readonly_fields = ('userTo', 'userFrom')
-
-    def has_add_permission(self, request, obj=None):
-        return False  # Запрещаем добавление вручную
-
-    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
-        extra_context = extra_context or {}
-        extra_context['show_save_and_continue'] = False
-        extra_context['show_save'] = False
-        return super(AutoCopyAdmin, self).changeform_view(request, object_id, extra_context=extra_context)
-
-# Регистрация моделей в Django Admin
-admin.site.register(AutoCopyTask, AutoCopyAdmin)
-admin.site.register(Folder, FolderAdmin)
-admin.site.register(Link, LinkAdmin)
-admin.site.register(UserSettings)
-admin.site.register(Logs, LogsAdmin)
+async profileCopy(copyFrom: string, copyTo: string, autoCopy: boolean) {
+    let url = `${import.meta.env.NG_APP_API_URL}/plitki/copy/`
+    return axios.post(url, {"copyFrom": copyFrom, "copyTo": copyTo, "autoCopy": autoCopy, "id": 1},
+      {
+        headers: {
+          "X-CSRFToken": await this.backend.getcsrftoken()
+        },
+        withCredentials: true
+      })
+      .then((response: any) => {
+        return response.data
+      })
+      .catch((error: any) => {
+        return {"error": "Ошибка получения данных с сервера"}
+      });
+  }
