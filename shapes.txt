@@ -1,17 +1,141 @@
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def ProfileCopy(request):
-    if request.user.is_staff:
-        try:
-            userFrom = User.objects.get(username=request.data['copyFrom'])
-            userTo = User.objects.get(username=request.data['copyTo'])
-            copy_profile(userTo, userFrom)
-            if request.data['autoCopy']:
-                try:
-                    AutoCopyTask.objects.create(userFrom=userFrom, userTo=userTo)
-                except:
-                    return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован, но задача для "{userTo.last_name} {userTo.first_name}" уже существует'}) 
-            return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован'}) 
-        except Exception as e:
-            return JsonResponse({'error': f'Ошибка: {e}'}) 
-    return JsonResponse({'error': f'Отказано'}) 
+@Component({
+  selector: 'app-settings',
+  templateUrl: './settings.component.html',
+  styleUrl: './settings.component.css'
+})
+
+export class SettingsComponent implements OnInit {
+
+  admin: boolean = false;
+  selectedTheme: any = undefined
+  settings: any = {}
+  days: number = 0
+  gateAllUpdate: boolean = false
+  gateTabOpen: boolean = false
+  usernames: any[] = [];
+  choosenLogUsername: string | undefined = undefined
+  log: any[] = []
+  users: any[] = []
+  listCopyToUsers: any[] = []
+  listOfDisplayUsers: any[] = [];
+  searchValue = '';
+  visible = false;
+  copyUserTo: string | undefined = undefined
+  copyUserFrom: string | undefined = undefined
+  showCopyAccept: boolean = false
+  alwaysYesterday: boolean = false
+  autoCopy: boolean = false
+  listAutoCopy: any[] = []
+  PLITKI_AD_GROUP = import.meta.env.NG_APP_PLITKI_AD_GROUP
+  ADMIN_URL = import.meta.env.NG_APP_ADMIN_URL
+
+  constructor(private userService: UserService, private formBuilder: FormBuilder, private notifications: NotificationsService, private themeService: ThemeService, private notification: NzNotificationService, private fileService: GateFileService, private plitkiService: PlitkiService) {
+
+  }
+
+  async ngOnInit() {
+    const data = await this.userService.whoami()
+    this.settings = data.settings
+    this.days = this.settings.days
+    this.gateAllUpdate = this.settings.gateAllUpdate
+    this.gateTabOpen = this.settings.gateTabOpen
+    this.selectedTheme = this.settings.theme
+    this.alwaysYesterday = this.settings.alwaysYesterday
+    this.admin = data.is_admin
+    if (this.admin) {
+      this.usernames = await this.plitkiService.getLogsList();
+      this.plitkiService.getAutoCopyList().then(data => {
+        if(data.error)
+          this.notifications.showError(data.error)
+        else if (data.tasks)
+          this.listAutoCopy = data.tasks
+      });
+      let data = await this.userService.getUsersList()
+      if (data.error)
+        this.notifications.showError(data.error)
+      else {
+        this.users = data.data;
+        this.listOfDisplayUsers = [...this.users]
+        this.createCopyList()
+      }
+    }
+  }
+
+  resetFIO(): void {
+    this.searchValue = '';
+    this.searchFIO();
+  }
+
+  searchFIO(): void {
+    this.visible = false;
+    this.listOfDisplayUsers = this.users.filter((item) => item.fio.indexOf(this.searchValue) !== -1);
+  }
+
+  setTheme(value: any) {
+    this.settings.theme = value
+    this.themeService.theme.next(this.settings.theme)
+    this.saveSettings()
+  }
+
+  async logChanger(username: string) {
+    let data = await this.plitkiService.getLog(username)
+    if (data.error)
+      this.notifications.showError(data.error)
+    else {
+      this.log = data.log.sort((a: any,b: any) => (a.time > b.time ? -1 : 1))
+    }
+
+  }
+
+
+  submitGeneral(): void {
+    this.settings.days = this.days
+    this.settings.gateAllUpdate = this.gateAllUpdate
+    this.settings.gateTabOpen = this.gateTabOpen
+    this.settings.alwaysYesterday = this.alwaysYesterday
+    this.fileService.deleteGateFilesFromCache(this.settings.days)
+    this.saveSettings()
+  }
+
+  saveSettings() {
+    this.userService.saveSettings(this.settings).then( (data: any) => {
+      if (data.error)
+        this.notifications.showError(data.error)
+      else
+        this.notifications.showNotification(data.data)
+    })
+  }
+
+  copyChanger() {
+    this.createCopyList()
+    if(this.copyUserFrom != undefined) {
+      this.listCopyToUsers.splice(this.listCopyToUsers.findIndex(el => el.username === this.copyUserFrom), 1)
+    }
+    if(this.copyUserTo != undefined) {
+      this.listCopyToUsers.splice(this.listCopyToUsers.findIndex(el => el.username === this.copyUserTo), 1)
+    }
+  }
+
+  showCopy() {
+    if(this.copyUserFrom && this.copyUserTo)
+      this.showCopyAccept = true
+  }
+
+  submitCopy() {
+    this.plitkiService.profileCopy(this.copyUserFrom!, this.copyUserTo!, this.autoCopy, 0).then( data => {
+      this.showCopyAccept = false
+      if (data.error)
+        this.notifications.showError(data.error)
+      else
+        this.notifications.showNotification(data.detail)
+    })
+  }
+  
+  copyCancel() {
+    this.showCopyAccept = false
+  }
+
+  createCopyList() {
+    this.listCopyToUsers = [...this.users]
+  }
+}
