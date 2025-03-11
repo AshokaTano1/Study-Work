@@ -1,17 +1,27 @@
-// функция для копирования профиля с добавлением ID 
-  async profileCopy(copyFrom: string, copyTo: string, autoCopy: boolean, idTab: number) {
-    let url = `${import.meta.env.NG_APP_API_URL}/plitki/copy/`
-    return axios.post(url, {"copyFrom": copyFrom, "copyTo": copyTo, "autoCopy": autoCopy, "idTab": idTab},
-      {
-        headers: {
-          "X-CSRFToken": await this.backend.getcsrftoken()
-        },
-        withCredentials: true
-      })
-      .then((response: any) => {
-        return response.data
-      })
-      .catch((error: any) => {
-        return {"error": "Ошибка получения данных с сервера"}
-      });
-  }
+# Функция копирования профиля
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def ProfileCopy(request):
+    if request.user.is_staff:
+        try:
+            userFrom = User.objects.get(username=request.data['copyFrom'])
+            userTo = User.objects.get(username=request.data['copyTo'])
+            copy_profile(userTo, userFrom)
+            idTab = request.data.get('idTab', None)#добавлен idTab 
+
+            if idTab is None:
+                return JsonResponse({'error': 'idTab не передан в запросе'})#добавлен idTab 
+
+            copy_profile(userTo, userFrom)
+            
+            if request.data['autoCopy']:
+                try:
+                    AutoCopyTask.objects.create(userFrom=userFrom, userTo=userTo)
+                except:
+                    return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован, но задача для "{userTo.last_name} {userTo.first_name}" уже существует',
+                    'idTab': idTab})#добавлен idTab 
+
+            return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован', 'idTab':idTab})#добавлен idTab 
+        except Exception as e:
+            return JsonResponse({'error': f'Ошибка: {e}'}) 
+    return JsonResponse({'error': f'Отказано'}) 
