@@ -1,172 +1,424 @@
-from django.db import models
-from django.contrib.auth.models import User
-from django.utils.translation import gettext_lazy as _
-from django.core.validators import MaxValueValidator, MinValueValidator
-from copy import deepcopy
-from django.db import transaction
+import os
+from .serializers import *
+from .models import *
+from django.contrib.auth import authenticate, login, logout
+from django.http import JsonResponse
+from django.middleware.csrf import get_token
+from rest_framework.permissions import IsAuthenticated
+import json
+import requests
+from rest_framework.decorators import api_view, permission_classes
+from loguru import logger
+from django.urls import resolve
 
-# Общая модель для всех плиток
-class PlitkaAbstract(models.Model):
-    def get_default_border():
-        return {"color": "#ffffff", "style": "solid", "size": 1}
+def GetGateToken():
+    data = {
+        'grant_type': 'client_credentials',
+        'client_id': os.environ["CLIENT_ID"],
+        'client_secret': os.environ["CLIENT_SECRET"]
+    }
+    try:
+        response = requests.post(f"{os.environ['GATE_ADDR']}/oauth2/token/", data=data)
+        return response.json()['access_token']
+    except Exception as e:
+        return f'Ошибка получения данных из Шлюза: {e}'
 
-    def get_default_font():
-        return {"color": "#ffffff", "style": "normal"}
+def GetFolderStructure(folder, user):
+    # Получаем ссылки, принадлежащие текущей папке
+    folders = []
+    links = []
+    for link in Link.objects.filter(inFolder=folder, user=user):
+        links.append({
+            'id': f'link-{link.id}',
+            'title': link.title,
+            'w': link.w,
+            'h': link.h,
+            'y': link.y,
+            'dashboardX': link.dashboardX,
+            'color': link.color,
+            'border': link.border,
+            'font': link.font,
+            'description': link.description,
+            'url': link.url,
+            'gateFileHash': link.gateFileHash,
+            'gateCheckFile': link.gateCheckFile
+        })
+    # Получаем дочерние папки
+    for child in Folder.objects.filter(inFolder=folder, user=user):
+        folders.append(GetFolderStructure(child, user))
+    return {
+        'id': f'folder-{folder.id}',
+        'title': folder.title,
+        'w': folder.w,
+        'h': folder.h,
+        'y': folder.y,
+        'dashboardX': folder.dashboardX,
+        'color': folder.color,
+        'border': folder.border,
+        'font': folder.font,
+        'description': folder.description,
+        'links': links,
+        'folders': folders
+    }
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])  
+def SendDataView(request, **kwargs):
+    '''
+    Функция, которая передаёт JSON-объект плиток всех пользователя вида:
+    {
+        "id":"",
+        "folders": [
+            "id":"folder-1",
+            "folders": [
+                ...
+            ],
+            "links": [
+                {
+                "id":"link-3",
+                "url":"..."
+                },
+                {
+                "id":"link-4",
+                "url":"..."
+                }
+            ]
+        ] 
+        "links": [
+            {
+            "id":"link-1",
+            "url":"..."
+            },
+            {
+            "id":"link-2",
+            "url":"..."
+            }
+        ]
+    }
+    '''
+    try:
+        '''
+        В полученном аргументе функции, который является URL, проверяется 
+        принадлежность к URL-классу "shared"
+        '''
+        if resolve(request.path_info).url_name == 'shared' and 'user' in kwargs:
+            shared = UserSettings.objects.get(user__username=kwargs['user'])
+            if shared.shared:
+                user = shared.user.id
+            else:
+                return JsonResponse({'error': f'Ошибка доступа'})
+        else:
+            user = request.user.id
+        structure = []
+        folders = []
+        links = []
+        # Перемещает все ссылки, у которых infolder указывает на главную страницу (None)
+        for link in Link.objects.filter(inFolder=None, user=user):
+            links.append({
+                'id': f'link-{link.id}',
+                'title': link.title,
+                'w': link.w,
+                'h': link.h,
+                'y': link.y,
+                'dashboardX': link.dashboardX,
+                'color': link.color,
+                'border': link.border,
+                'font': link.font,
+                'description': link.description,
+                'url': link.url,
+                'gateFileHash': link.gateFileHash,
+                'gateCheckFile': link.gateCheckFile
+            })
+        # Перемещает все папки, у которых infolder указывает на главную страницу
+        for folder in Folder.objects.filter(inFolder=None, user=user):
+            folders.append(GetFolderStructure(folder, user))
+        structure.append({
+            'id': '',
+            'links': links,
+            'folders': folders
+        }) 
+        return JsonResponse({"data": json.dumps(structure, indent=4, ensure_ascii=False)}, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": f"Ошибка получения данных ссылок пользователя {user} из БД: {e}"}, safe=False)
+
+#Функция для проверки аутентификации пользователя
+def SessionView(request, format=None):
+    if request.user and not request.user.is_anonymous and request.user.is_active:
+        return JsonResponse({'isAuthenticated': True})
+    else:
+        return JsonResponse({'isAuthenticated': False})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def SharedList(request, format=None):
+    try:
+        sharedUsers = []
+        for user in UserSettings.objects.filter(shared=True):
+            sharedUsers.append({
+                'url': user.user.username,
+                'username': user.customName or f'{user.user.last_name} {user.user.first_name}'
+            })
+        return JsonResponse({'data': sharedUsers})
+    except Exception as e:
+        return JsonResponse({'error': f'{e}'})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+# Возвращает параметры пользователя
+def WhoamiView(request, format=None):
+    settings = UserSettings.objects.get(user=request.user)
+    return JsonResponse({'username': request.user.username, 'first_name': request.user.first_name, 'last_name': request.user.last_name, 'is_admin': request.user.is_staff, 'gateUUID': settings.gateUUID, 'settings': {
+        'theme': settings.theme,
+        'days': settings.days,
+        'gateAllUpdate': settings.gateAllUpdate,
+        'alwaysYesterday': settings.alwaysYesterday,
+        'gateTabOpen': settings.gateTabOpen
+    }})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+# Получает информацию о настройках и сохраняет их в БД
+def SettingsCallbackView(request, format=None):
+    try:
+        UserSettings.objects.filter(user=request.user.id).update(theme=request.data['data']['theme'], days=request.data['data']['days'], gateAllUpdate=request.data['data']['gateAllUpdate'], alwaysYesterday=request.data['data']['alwaysYesterday'], gateTabOpen=request.data['data']['gateTabOpen'])
+        return JsonResponse({'data': 'Данные сохранены'})
+    except Exception as e:
+        return JsonResponse({'error': {e}})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def AutoCopyListView(request, format=None):
+    try:
+        tasks = []
+        for task in AutoCopyTask.objects.all():
+            tasks.append({
+                "id": task.id,
+                "userFrom": f"{task.userFrom.last_name} {task.userFrom.first_name}",
+                "userTo": f"{task.userTo.last_name} {task.userTo.first_name}"
+            })
+        return JsonResponse({'tasks': tasks})
+    except Exception as e:
+        return JsonResponse({'error': f'{e}'})
+
+def FindFolderInData(data, id: str):
+    for item in data:
+        if item['id'] == id:
+            return item
+        found = FindFolderInData(item.get('folders', []), id)
+        if found:
+            return found
+    return None
+
+def CreateDeleteOrUpdateRecords(model, user, data, folder):
+    # Поиск уже созданных значений в конкретной папке
+    existingRecordsDict = {record.id: record for record in model.objects.filter(user=user, inFolder=folder).in_bulk().values()}
+    for item in data:
+        item.pop('added', None)
+        item.pop('gateFileHash', None)
+        item.pop('gateFileUpdated', None)
+        item.pop('x', None)
+        if "new" in item['id']:
+            item.pop('id', None)
+            item['user'] = user
+            item['inFolder'] = folder
+            model.objects.create(**item)
+        else:
+            id = int(item['id'].split('-')[-1])
+            item.pop('id', None)
+            record = existingRecordsDict[id]
+            for field, value in item.items():
+                setattr(record, field, value)
+            record.save()
+            del existingRecordsDict[id]
+    # Удаление оставшихся элементов из БД, если они не были обновлены
+    for id in existingRecordsDict:
+        existingRecordsDict[id].delete()
     
-    # Пользователь, которому принадлежит Плитка
-    user = models.ForeignKey(to=User, on_delete=models.CASCADE, null=False)
-    # Ширина Плитки
-    w = models.PositiveIntegerField(null=False, default=1) 
-    # Высота Плитки
-    h = models.PositiveIntegerField(null=False, default=1)
-    # Координата по горизонтали в расположении общей страницы отображения Плиток (включает все страницы)
-    dashboardX = models.PositiveIntegerField(null=False)
-    # Координата по вертикали. Максимальное значение - 7
-    y = models.PositiveIntegerField(validators=[
-        MaxValueValidator(8)
-        ], null=False)
-    # Цвет Плитки
-    color = models.CharField(null=False, max_length=7, default='default')
-    # Граница Плитки вида:
-    # {
-    #     "color": "#ffffff",    - Цвет границы
-    #     "style": "solid",      - Стиль границы 
-    #     "size": 1              - Толщина границы
-    # }
-    border = models.JSONField(null=False, default=get_default_border)
-    # Шрифт Плитки вида:
-    # {
-    #     "color": "#d6dff1",    - Цвет шрифта
-    #     "style": "normal"      - Стиль шрифта
-    # }
-    font = models.JSONField(null=False, default=get_default_font)
-    # Текст Плитки
-    title = models.TextField(null=False)
-    idTab = models.IntegerField(blank=True, null=True)
-    # Дополнительное описание
-    description = models.TextField(blank=True, null=True)
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+# Сохраняет плитки в БД
+def SaveDataView(request):
+    try:
+        data = request.data['data']
+        # Текущая папка
+        currentFolder = None
+        user = User.objects.get(id=request.user.id)
+        # Определяем текущую папку
+        # Если пришло None, то перезаписывается вся главная папка 
+        # Если пришёл id, то перезаписывается только папка с этим id и её дочерние объекты
+        if "id" in request.data and "folder" in request.data['id']:
+            currentFolder = Folder.objects.get(user=request.user.id, id=request.data['id'].split('-')[-1])
+            folderData = FindFolderInData(data, request.data['id'])
+            if folderData:
+                folders = folderData['folders']
+                links = folderData['links']
+            else:
+                return JsonResponse({"error": "Неверные данные"}, safe=False)
+        else:
+            folders = data[0]['folders']
+            links = data[0]['links']
+        # Создаёт, удаляет или редактирует записи в БД (папки) согласно передаваемым параметрам
+        CreateDeleteOrUpdateRecords(Folder, user, folders, currentFolder)
+        # Создаёт, удаляет или редактирует записи в БД (сылки) согласно передаваемым параметрам
+        CreateDeleteOrUpdateRecords(Link, user, links, currentFolder)
+        return JsonResponse({"detail": "Плитки успешно сохранены"}, safe=False)
+    except Exception as e:
+        logger.error(f"Ошибка сохранения данных: {e}") 
+        return JsonResponse({'error': f"Ошибка сохранения данных: {e}"}) 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])  
+def SendGateData(request):
+    try:
+        token = GetGateToken()
+        return JsonResponse({'token': token}) 
+    except Exception as e:
+        return JsonResponse({'error': f'{e}'})
     
-    class Meta:
-        abstract = True
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def GateOpenCallback(request):
+    try:
+        if 'url' in request.data and 'hash' in request.data:
+            Link.objects.filter(url=request.data['url']).update(gateFileHash=request.data['hash'])
+        return JsonResponse({'data': 'Запись хэша файла внесена'}) 
+    except Exception as e:
+        return JsonResponse({'error': f'{e}'}) 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def LogCallback(request):
+    try:
+        Logs.objects.create(user=User.objects.get(id=request.user.id), time=request.data['data']['time'], url=request.data['data']['url'], text=request.data['data']['text'], ip=request.META.get('HTTP_X_FORWARDED_FOR'))
+        return JsonResponse({'detail': 'Запись внесена'})
+    except Exception as e:
+        return JsonResponse({'error': f'{e}'}) 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def UsersList(request):
+    if request.user.is_staff:
+        users = []
+        for user in User.objects.all():
+            try:
+                settings = UserSettings.objects.get(user=user)
+                users.append({
+                    'id': user.id,
+                    'username': user.username,
+                    'fio': f"{user.last_name} {user.first_name}",
+                    'is_staff': user.is_staff,
+                    'last_login': user.last_login.strftime("%Y-%m-%d %H:%M:%S"),
+                    'is_active': user.is_active,
+                    'gateUUID': True if settings.gateUUID else False
+                })
+            except UserSettings.DoesNotExist:
+                logger.error(f'Отсутствуют настройки для пользователя {user.username}')
+        return JsonResponse({'data': users})
+    return JsonResponse({'error': f'Отказано в доступе'}) 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def LogsList(request):
+    if request.user.is_staff:
+        try:
+            usernames = []
+            for user in User.objects.filter(logs__isnull=False).distinct():
+                usernames.append({
+                    "fio": f"{user.last_name} {user.first_name}",
+                    "username": user.username
+                })
+            return JsonResponse({'usernames': usernames})
+        except Exception as e:
+            return JsonResponse({'error': f'Ошибка: {e}'}) 
+    return JsonResponse({'error': f'Отказано в доступе'})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def LogView(request):
+    if request.user.is_staff:
+        try:
+            logs = []
+            for log in Logs.objects.filter(user=User.objects.get(username=request.data['username'])):
+                logs.append({
+                    "time": log.time,
+                    "text": log.text,
+                    "url": log.url,
+                    "ip": log.ip
+                })
+            return JsonResponse({'log': logs})
+        except Exception as e:
+            return JsonResponse({'error': f'Ошибка: {e}'}) 
+    return JsonResponse({'error': f'Отказано'}) 
+
+
+# Функция копирования профиля
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def ProfileCopy(request):
+    if request.user.is_staff:
+        try:
+            userFrom = User.objects.get(username=request.data['copyFrom'])
+            userTo = User.objects.get(username=request.data['copyTo'])
+            idTab = request.data.get('idTab', None)#добавлен idTab 
+            copy_profile(userTo, userFrom)
+            
+
+            if idTab is None:
+                return JsonResponse({'error': 'idTab не передан в запросе'})#добавлен idTab 
+
+            
+            if request.data['autoCopy']:
+                try:
+                    AutoCopyTask.objects.create(userFrom=userFrom, userTo=userTo)
+                except:
+                    return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован, но задача для "{userTo.last_name} {userTo.first_name}" уже существует',
+                    'idTab': idTab})#добавлен idTab 
+
+            return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован', 'idTab':idTab})#добавлен idTab 
+        except Exception as e:
+            return JsonResponse({'error': f'Ошибка: {e}'}) 
+    return JsonResponse({'error': f'Отказано'}) 
         
-class Folder(PlitkaAbstract):
-    # Ссылка на родительскую папку (NULL обозначает, что объект находится в "корневом каталоге". 
-    # Заданное значение, обозначает, что объект находится в заданном родительском каталоге)
-    inFolder = models.ForeignKey('self', blank=True, null=True, on_delete=models.CASCADE, verbose_name=_('Folder'))
+
+# Запросы, на получение CSRF токена и аутентификацию
+def GetCSRFTokenView(request):
+    response = JsonResponse({'detail': 'CSRF cookie установлены'})
+    response['X-CSRFToken'] = get_token(request)
+    return response
+
+# API входа в систему
+def LoginView(request, **kwargs):
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+        password = data.get('password')
+        remember = data.get('remember')
+        if username is None or password is None:
+            return JsonResponse({'error': 'Пожалуйста, предоставьте логин и пароль'}, status=400)
+        user = authenticate(username=username, password=password)
+        if user is None:
+            return JsonResponse({'error': 'Неверный логин или пароль'}, status=400)
+        if not remember:
+            request.session.set_expiry(0)
+        login(request, user)
+        try:
+            token = GetGateToken()
+            headers = {'Authorization': 'Bearer ' + token}
+            data = {
+                'username': username
+            }
+            response = requests.post(f"{os.environ['GATE_ADDR']}/api/user/get_uuid/", headers=headers, data=data)
+            user, created = UserSettings.objects.get_or_create(user=user)
+            UserSettings.objects.filter(user=request.user.id).update(gateUUID=response.json()['data']['uuid'])
+        except Exception as e:
+            logger.error(f"Пользователь {username} не может получить данные от Шлюза: {e}")
+        return JsonResponse({'detail': 'Успешный вход'})
+    except Exception as e:
+        return JsonResponse({'error': f'Ошибка входа: {e}'}, status=400)
     
-    def __str__(self):
-        return f"{self.id}: {self.title}"
-
-class Link(PlitkaAbstract):
-    # Ссылка на объект
-    url = models.URLField(null=True, blank=True)
-    # Ссылка на родительскую папку (NULL обозначает, что объект находится в "корневом каталоге". 
-    # Заданное значение, обозначает, что объект находится в заданном каталоге)
-    inFolder = models.ForeignKey(Folder, blank=True, null=True, on_delete=models.CASCADE, verbose_name=_('Folder'))
-    # Хэш файла для получаемого со шлюза 
-    gateFileHash = models.CharField(max_length=32, blank=True, null=True, verbose_name=_('Hash'))
-    # Параметр, отвечающий за включение отображения обновления файла.
-    gateCheckFile = models.BooleanField(blank=True, null=True)
-   
-    def __str__(self):
-        return f"{self.id}: {self.title}"
-
-class UserSettings(models.Model):
-    """
-    Модель пользовательских настроек
-    """
-    themeLight = "light"
-    themeDark = "dark"
-    themeModern = "modern"
-    themeRZD = "rzd"
-
-    themeChoose = (
-        (themeLight, 'Light'),
-        (themeDark, 'Dark'),
-        (themeModern, 'Modern'),
-        (themeRZD, 'RZD'),
-    )
-    user = models.ForeignKey(to=User, on_delete=models.CASCADE, null=False)
-    theme = models.CharField(null=False, max_length=7, choices=themeChoose, default="light")
-    days = models.PositiveIntegerField(null=False, validators=[
-            MaxValueValidator(90),
-            MinValueValidator(1)
-        ], default=1)
-    gateUUID = models.UUIDField(blank=True, null=True, editable=False)
-    gateAllUpdate = models.BooleanField(default=False, verbose_name=_('Update All Gate Files')) 
-    gateTabOpen = models.BooleanField(default=False, verbose_name=_('Open Gate Files in new tab')) 
-    alwaysYesterday = models.BooleanField(default=False, verbose_name=_('View Yesterday Day')) 
-    shared = models.BooleanField(default=False, verbose_name=_('Shared User')) 
-    customName = models.TextField(null=True, blank=True)
-
-    def __str__(self):
-        return self.user.username
-    
-    class Meta:  
-        verbose_name_plural = 'User Settings'
-
-
-class Logs(models.Model):
-    user = models.ForeignKey(to=User, on_delete=models.CASCADE, null=False)
-    time = models.CharField(max_length=19, blank=False, null=False)
-    url = models.URLField(null=False, blank=False)
-    text = models.TextField(blank=False, null=False)
-    ip = models.GenericIPAddressField(blank=False, null=False)
-
-    def __str__(self):
-        return f"{self.time}: {self.text}"
-
-    class Meta:  
-        verbose_name_plural = 'Logs'
-
-class AutoCopyTask(models.Model):
-    userTo = models.OneToOneField(to=User, on_delete=models.CASCADE, null=False, related_name="user_copy_to", verbose_name=_('To'))
-    userFrom = models.ForeignKey(to=User, on_delete=models.CASCADE, null=False, related_name="user_copy_from", verbose_name=_('From'))
-
-    def __str__(self):
-        return f"Автокопирование: {self.userFrom.last_name} {self.userFrom.first_name} -> {self.userTo.last_name} {self.userTo.first_name}"
-
-def post_changed_user_plitki(sender, instance, **kwargs):
-    tasks = AutoCopyTask.objects.filter(userFrom=instance.user)
-    for task in tasks:
-        copy_profile(task.userTo, task.userFrom)
-
-models.signals.post_save.connect(post_changed_user_plitki, sender=Folder)
-models.signals.post_save.connect(post_changed_user_plitki, sender=Link)
-
-def __SaveFolderStructure(folderFrom, folderTo, userFrom, userTo):
-    for link in Link.objects.filter(inFolder=folderFrom, user=userFrom):
-        link.pk = None
-        link.inFolder = folderTo
-        link.user = userTo
-        with transaction.atomic():
-            link.save()
-    for child in Folder.objects.filter(inFolder=folderFrom, user=userFrom):
-        child.idTab = 0
-        folderFrom = deepcopy(child)
-        child.pk = None
-        child.inFolder = folderTo
-        child.user = userTo
-        with transaction.atomic():
-            child.save()
-        __SaveFolderStructure(folderFrom, child, userFrom, userTo)
-
-def copy_profile(userTo, userFrom, idTab):
-    Link.objects.filter(user=userTo).delete()
-    Folder.objects.filter(user=userTo).delete()
-    for link in Link.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
-        link.idTab = 0
-        link.pk = None
-        link.user = userTo
-        link.inFolder = None
-        with transaction.atomic():
-            link.save()
-    for folder in Folder.objects.filter(inFolder=None, user=userFrom):
-        folder.idTab = 0
-        folderFrom = deepcopy(folder)
-        folder.pk = None
-        folder.user = userTo
-        folder.inFolder = None
-        with transaction.atomic():
-            folder.save()
-        __SaveFolderStructure(folderFrom, folder, userFrom, userTo)
+# Выход из системы
+def LogoutView(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'detail': 'Вы не вошли в систему'}, status=400)
+    logout(request)
+    return JsonResponse({'detail': 'Успешный выход'})
