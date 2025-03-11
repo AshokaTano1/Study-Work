@@ -1,27 +1,172 @@
-# Функция копирования профиля
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def ProfileCopy(request):
-    if request.user.is_staff:
-        try:
-            userFrom = User.objects.get(username=request.data['copyFrom'])
-            userTo = User.objects.get(username=request.data['copyTo'])
-            copy_profile(userTo, userFrom)
-            idTab = request.data.get('idTab', None)#добавлен idTab 
+from django.db import models
+from django.contrib.auth.models import User
+from django.utils.translation import gettext_lazy as _
+from django.core.validators import MaxValueValidator, MinValueValidator
+from copy import deepcopy
+from django.db import transaction
 
-            if idTab is None:
-                return JsonResponse({'error': 'idTab не передан в запросе'})#добавлен idTab 
+# Общая модель для всех плиток
+class PlitkaAbstract(models.Model):
+    def get_default_border():
+        return {"color": "#ffffff", "style": "solid", "size": 1}
 
-            copy_profile(userTo, userFrom)
-            
-            if request.data['autoCopy']:
-                try:
-                    AutoCopyTask.objects.create(userFrom=userFrom, userTo=userTo)
-                except:
-                    return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован, но задача для "{userTo.last_name} {userTo.first_name}" уже существует',
-                    'idTab': idTab})#добавлен idTab 
+    def get_default_font():
+        return {"color": "#ffffff", "style": "normal"}
+    
+    # Пользователь, которому принадлежит Плитка
+    user = models.ForeignKey(to=User, on_delete=models.CASCADE, null=False)
+    # Ширина Плитки
+    w = models.PositiveIntegerField(null=False, default=1) 
+    # Высота Плитки
+    h = models.PositiveIntegerField(null=False, default=1)
+    # Координата по горизонтали в расположении общей страницы отображения Плиток (включает все страницы)
+    dashboardX = models.PositiveIntegerField(null=False)
+    # Координата по вертикали. Максимальное значение - 7
+    y = models.PositiveIntegerField(validators=[
+        MaxValueValidator(8)
+        ], null=False)
+    # Цвет Плитки
+    color = models.CharField(null=False, max_length=7, default='default')
+    # Граница Плитки вида:
+    # {
+    #     "color": "#ffffff",    - Цвет границы
+    #     "style": "solid",      - Стиль границы 
+    #     "size": 1              - Толщина границы
+    # }
+    border = models.JSONField(null=False, default=get_default_border)
+    # Шрифт Плитки вида:
+    # {
+    #     "color": "#d6dff1",    - Цвет шрифта
+    #     "style": "normal"      - Стиль шрифта
+    # }
+    font = models.JSONField(null=False, default=get_default_font)
+    # Текст Плитки
+    title = models.TextField(null=False)
+    idTab = models.IntegerField(blank=True, null=True)
+    # Дополнительное описание
+    description = models.TextField(blank=True, null=True)
+    
+    class Meta:
+        abstract = True
+        
+class Folder(PlitkaAbstract):
+    # Ссылка на родительскую папку (NULL обозначает, что объект находится в "корневом каталоге". 
+    # Заданное значение, обозначает, что объект находится в заданном родительском каталоге)
+    inFolder = models.ForeignKey('self', blank=True, null=True, on_delete=models.CASCADE, verbose_name=_('Folder'))
+    
+    def __str__(self):
+        return f"{self.id}: {self.title}"
 
-            return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован', 'idTab':idTab})#добавлен idTab 
-        except Exception as e:
-            return JsonResponse({'error': f'Ошибка: {e}'}) 
-    return JsonResponse({'error': f'Отказано'}) 
+class Link(PlitkaAbstract):
+    # Ссылка на объект
+    url = models.URLField(null=True, blank=True)
+    # Ссылка на родительскую папку (NULL обозначает, что объект находится в "корневом каталоге". 
+    # Заданное значение, обозначает, что объект находится в заданном каталоге)
+    inFolder = models.ForeignKey(Folder, blank=True, null=True, on_delete=models.CASCADE, verbose_name=_('Folder'))
+    # Хэш файла для получаемого со шлюза 
+    gateFileHash = models.CharField(max_length=32, blank=True, null=True, verbose_name=_('Hash'))
+    # Параметр, отвечающий за включение отображения обновления файла.
+    gateCheckFile = models.BooleanField(blank=True, null=True)
+   
+    def __str__(self):
+        return f"{self.id}: {self.title}"
+
+class UserSettings(models.Model):
+    """
+    Модель пользовательских настроек
+    """
+    themeLight = "light"
+    themeDark = "dark"
+    themeModern = "modern"
+    themeRZD = "rzd"
+
+    themeChoose = (
+        (themeLight, 'Light'),
+        (themeDark, 'Dark'),
+        (themeModern, 'Modern'),
+        (themeRZD, 'RZD'),
+    )
+    user = models.ForeignKey(to=User, on_delete=models.CASCADE, null=False)
+    theme = models.CharField(null=False, max_length=7, choices=themeChoose, default="light")
+    days = models.PositiveIntegerField(null=False, validators=[
+            MaxValueValidator(90),
+            MinValueValidator(1)
+        ], default=1)
+    gateUUID = models.UUIDField(blank=True, null=True, editable=False)
+    gateAllUpdate = models.BooleanField(default=False, verbose_name=_('Update All Gate Files')) 
+    gateTabOpen = models.BooleanField(default=False, verbose_name=_('Open Gate Files in new tab')) 
+    alwaysYesterday = models.BooleanField(default=False, verbose_name=_('View Yesterday Day')) 
+    shared = models.BooleanField(default=False, verbose_name=_('Shared User')) 
+    customName = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.user.username
+    
+    class Meta:  
+        verbose_name_plural = 'User Settings'
+
+
+class Logs(models.Model):
+    user = models.ForeignKey(to=User, on_delete=models.CASCADE, null=False)
+    time = models.CharField(max_length=19, blank=False, null=False)
+    url = models.URLField(null=False, blank=False)
+    text = models.TextField(blank=False, null=False)
+    ip = models.GenericIPAddressField(blank=False, null=False)
+
+    def __str__(self):
+        return f"{self.time}: {self.text}"
+
+    class Meta:  
+        verbose_name_plural = 'Logs'
+
+class AutoCopyTask(models.Model):
+    userTo = models.OneToOneField(to=User, on_delete=models.CASCADE, null=False, related_name="user_copy_to", verbose_name=_('To'))
+    userFrom = models.ForeignKey(to=User, on_delete=models.CASCADE, null=False, related_name="user_copy_from", verbose_name=_('From'))
+
+    def __str__(self):
+        return f"Автокопирование: {self.userFrom.last_name} {self.userFrom.first_name} -> {self.userTo.last_name} {self.userTo.first_name}"
+
+def post_changed_user_plitki(sender, instance, **kwargs):
+    tasks = AutoCopyTask.objects.filter(userFrom=instance.user)
+    for task in tasks:
+        copy_profile(task.userTo, task.userFrom)
+
+models.signals.post_save.connect(post_changed_user_plitki, sender=Folder)
+models.signals.post_save.connect(post_changed_user_plitki, sender=Link)
+
+def __SaveFolderStructure(folderFrom, folderTo, userFrom, userTo):
+    for link in Link.objects.filter(inFolder=folderFrom, user=userFrom):
+        link.pk = None
+        link.inFolder = folderTo
+        link.user = userTo
+        with transaction.atomic():
+            link.save()
+    for child in Folder.objects.filter(inFolder=folderFrom, user=userFrom):
+        child.idTab = 0
+        folderFrom = deepcopy(child)
+        child.pk = None
+        child.inFolder = folderTo
+        child.user = userTo
+        with transaction.atomic():
+            child.save()
+        __SaveFolderStructure(folderFrom, child, userFrom, userTo)
+
+def copy_profile(userTo, userFrom, idTab):
+    Link.objects.filter(user=userTo).delete()
+    Folder.objects.filter(user=userTo).delete()
+    for link in Link.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
+        link.idTab = 0
+        link.pk = None
+        link.user = userTo
+        link.inFolder = None
+        with transaction.atomic():
+            link.save()
+    for folder in Folder.objects.filter(inFolder=None, user=userFrom):
+        folder.idTab = 0
+        folderFrom = deepcopy(folder)
+        folder.pk = None
+        folder.user = userTo
+        folder.inFolder = None
+        with transaction.atomic():
+            folder.save()
+        __SaveFolderStructure(folderFrom, folder, userFrom, userTo)
