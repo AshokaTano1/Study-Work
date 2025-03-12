@@ -1,25 +1,48 @@
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def ProfileCopy(request):
-    if request.user.is_staff:
-        try:
-            userFrom = User.objects.get(username=request.data['copyFrom'])
-            userTo = User.objects.get(username=request.data['copyTo'])
-            idTab = request.data.get('idTab', None)#добавлен idTab 
-            
-            if idTab is None:
-                return JsonResponse({'error': 'idTab не передан в запросе'})#добавлен idTab 
-            copy_profile(userTo, userFrom, idTab)
+var csrf = await fetch("http://localhost:8001/api/users/getcsrftoken/", {
+  "headers": {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "ru,en;q=0.9,en-GB;q=0.8,en-US;q=0.7",
+    "sec-ch-ua": "\"Not(A:Brand\";v=\"99\", \"Microsoft Edge\";v=\"133\", \"Chromium\";v=\"133\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site"
+  },
+  "referrer": "http://localhost:4201/",
+  "referrerPolicy": "strict-origin-when-cross-origin",
+  "body": null,
+  "method": "GET",
+  "mode": "cors",
+  "credentials": "include"
+})
+.then(function(response) {
+        return response.headers.get("x-csrftoken");
+    })
+    .then(function(text) {
+        return text
+    })
+    .catch(function(err) {
+        console.log(`Error: ${err}`)
+    });
 
-            
-            if request.data['autoCopy']:
-                try:
-                    AutoCopyTask.objects.create(userFrom=userFrom, userTo=userTo)
-                except:
-                    return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован, но задача для "{userTo.last_name} {userTo.first_name}" уже существует',
-                    'idTab': idTab})#добавлен idTab 
-
-            return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован', 'idTab':idTab})#добавлен idTab 
-        except Exception as e:
-            return JsonResponse({'error': f'Ошибка: {e}'}) 
-    return JsonResponse({'error': f'Отказано'})
+await fetch("http://localhost:8001/api/plitki/copy/", {
+  "headers": {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "ru,en;q=0.9,en-GB;q=0.8,en-US;q=0.7",
+    "content-type": "application/json",
+    "sec-ch-ua": "\"Not(A:Brand\";v=\"99\", \"Microsoft Edge\";v=\"133\", \"Chromium\";v=\"133\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "x-csrftoken": csrf
+  },
+  "referrer": "http://localhost:4201/",
+  "referrerPolicy": "strict-origin-when-cross-origin",
+  "body": "{\"copyFrom\":\"ruzhinskimv@krw.oao.rzd\",\"copyTo\":\"ivc_shtelmahva@krw.oao.rzd\",\"autoCopy\":false,\"idTab\":0}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
