@@ -1,48 +1,84 @@
-var csrf = await fetch("http://localhost:8001/api/users/getcsrftoken/", {
-  "headers": {
-    "accept": "application/json, text/plain, */*",
-    "accept-language": "ru,en;q=0.9,en-GB;q=0.8,en-US;q=0.7",
-    "sec-ch-ua": "\"Not(A:Brand\";v=\"99\", \"Microsoft Edge\";v=\"133\", \"Chromium\";v=\"133\"",
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "\"Windows\"",
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site"
-  },
-  "referrer": "http://localhost:4201/",
-  "referrerPolicy": "strict-origin-when-cross-origin",
-  "body": null,
-  "method": "GET",
-  "mode": "cors",
-  "credentials": "include"
-})
-.then(function(response) {
-        return response.headers.get("x-csrftoken");
-    })
-    .then(function(text) {
-        return text
-    })
-    .catch(function(err) {
-        console.log(`Error: ${err}`)
-    });
+INFO : 2025-03-12T08:30:12.312319+0000 : Копирование профиля успешно
+INFO "POST /api/plitki/copy/ HTTP/1.1" 200 341
+INFO "GET /api/users/getcsrftoken/ HTTP/1.1" 200 92
+INFO "OPTIONS /api/users/session/ HTTP/1.1" 200 0
+DEBUG (0.001) SELECT "django_session"."session_key", "django_session"."session_data", "django_session"."expire_date" FROM "django_session" WHERE ("django_session"."expire_date" > '2025-03-12 08:30:15.808180' AND "django_session"."session_key" = 'kw3d250gy846qaoecvj0dwz1rcegoays') LIMIT 21; args=('2025-03-12 08:30:15.808180', 'kw3d250gy846qaoecvj0dwz1rcegoays'); alias=default
+DEBUG (0.000) SELECT "auth_user"."id", "auth_user"."password", "auth_user"."last_login", "auth_user"."is_superuser", "auth_user"."username", "auth_user"."first_name", "auth_user"."last_name", "auth_user"."email", "auth_user"."is_staff", "auth_user"."is_active", "auth_user"."date_joined" FROM "auth_user" WHERE "auth_user"."id" = 41 LIMIT 21; args=(41,); alias=default
+INFO "GET /api/users/session/ HTTP/1.1" 200 25
+INFO "GET /api/users/getcsrftoken/ HTTP/1.1" 200 92
+INFO "GET /api/users/getcsrftoken/ HTTP/1.1" 200 92
+INFO "OPTIONS /api/users/whoami/ HTTP/1.1" 200 0
+INFO "OPTIONS /api/users/whoami/ HTTP/1.1" 200 0
+DEBUG (0.001) SELECT "django_session"."session_key", "django_session"."session_data", "django_session"."expire_date" FROM "django_session" WHERE ("django_session"."expire_date" > '2025-03-12 08:30:15.947668' AND "django_session"."session_key" = 'kw3d250gy846qaoecvj0dwz1rcegoays') LIMIT 21; args=('2025-03-12 08:30:15.947668', 'kw3d250gy846qaoecvj0dwz1rcegoays'); alias=default
+DEBUG (0.000) SELECT "auth_user"."id", "auth_user"."password", "auth_user"."last_login", "auth_user"."is_superuser", "auth_user"."username", "auth_user"."first_name", "auth_user"."last_name", "auth_user"."email", "auth_user"."is_staff", "auth_user"."is_active", "auth_user"."date_joined" FROM "auth_user" WHERE "auth_user"."id" = 41 LIMIT 21; args=(41,); alias=default
+DEBUG (0.000) SELECT "plitki_usersettings"."id", "plitki_usersettings"."user_id", "plitki_usersettings"."theme", "plitki_usersettings"."days", "plitki_usersettings"."gateUUID", "plitki_usersettings"."gateAllUpdate", "plitki_usersettings"."gateTabOpen", "plitki_usersettings"."alwaysYesterday", "plitki_usersettings"."shared", "plitki_usersettings"."customName" FROM "plitki_usersettings" WHERE "plitki_usersettings"."user_id" = 41 LIMIT 21; args=(41,); alias=default
+INFO "GET /api/users/whoami/ HTTP/1.1" 200 419
+DEBUG (0.001) SELECT "django_session"."session_key", "django_session"."session_data", "django_session"."expire_date" FROM "django_session" WHERE ("django_session"."expire_date" > '2025-03-12 08:30:16.009383' AND "django_session"."session_key" = 'kw3d250gy846qaoecvj0dwz1rcegoays') LIMIT 21; args=('2025-03-12 08:30:16.009383', 'kw3d250gy846qaoecvj0dwz1rcegoays'); alias=default
+DEBUG (0.000) SELECT "auth_user"."id", "auth_user"."password", "auth_user"."last_login", "auth_user"."is_superuser", "auth_user"."username", "auth_user"."first_name", "auth_user"."last_name", "auth_user"."email", "auth_user"."is_staff", "auth_user"."is_active", "auth_user"."date_joined" FROM "auth_user" WHERE "auth_user"."id" = 41 LIMIT 21; args=(41,); alias=default
+DEBUG (0.000) SELECT "plitki_usersettings"."id", "plitki_usersettings"."user_id", "plitki_usersettings"."theme", "plitki_usersettings"."days", "plitki_usersettings"."gateUUID", "plitki_usersettings"."gateAllUpdate", "plitki_usersettings"."gateTabOpen", "plitki_usersettings"."alwaysYesterday", "plitki_usersettings"."shared", "plitki_usersettings"."customName" FROM "plitki_usersettings" WHERE "plitki_usersettings"."user_id" = 41 LIMIT 21; args=(41,); alias=default
+INFO "GET /api/users/whoami/ HTTP/1.1" 200 419
+INFO "GET /api/users/getcsrftoken/ HTTP/1.1" 200 92
+INFO "GET /api/users/getcsrftoken/ HTTP/1.1" 200 92
+INFO "OPTIONS /api/plitki/get HTTP/1.1" 200 0
+INFO "OPTIONS /api/users/shared/ HTTP/1.1" 200 0
+DEBUG (0.001) SELECT "django_session"."session_key", "django_session"."session_data", "django_session"."expire_date" FROM "django_session" WHERE ("django_session"."expire_date" > '2025-03-12 08:30:16.222913' AND "django_session"."session_key" = 'kw3d250gy846qaoecvj0dwz1rcegoays') LIMIT 21; args=('2025-03-12 08:30:16.222913', 'kw3d250gy846qaoecvj0dwz1rcegoays'); alias=default
+DEBUG (0.000) SELECT "auth_user"."id", "auth_user"."password", "auth_user"."last_login", "auth_user"."is_superuser", "auth_user"."username", "auth_user"."first_name", "auth_user"."last_name", "auth_user"."email", "auth_user"."is_staff", "auth_user"."is_active", "auth_user"."date_joined" FROM "auth_user" WHERE "auth_user"."id" = 41 LIMIT 21; args=(41,); alias=default
+DEBUG (0.000) SELECT "plitki_usersettings"."id", "plitki_usersettings"."user_id", "plitki_usersettings"."theme", "plitki_usersettings"."days", "plitki_usersettings"."gateUUID", "plitki_usersettings"."gateAllUpdate", "plitki_usersettings"."gateTabOpen", "plitki_usersettings"."alwaysYesterday", "plitki_usersettings"."shared", "plitki_usersettings"."customName" FROM "plitki_usersettings" WHERE "plitki_usersettings"."shared"; args=(); alias=default
+INFO "GET /api/users/shared/ HTTP/1.1" 200 12
+DEBUG Exception while resolving variable 'name' in template 'unknown'.
+Traceback (most recent call last):
+  File "/opt/venv/lib/python3.12/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/venv/lib/python3.12/site-packages/django/core/handlers/base.py", line 181, in _get_response
+    callback, callback_args, callback_kwargs = self.resolve_request(request)
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/venv/lib/python3.12/site-packages/django/core/handlers/base.py", line 313, in resolve_request
+    resolver_match = resolver.resolve(request.path_info)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/venv/lib/python3.12/site-packages/django/urls/resolvers.py", line 705, in resolve
+    raise Resolver404({"tried": tried, "path": new_path})
+django.urls.exceptions.Resolver404: {'tried': [[<URLPattern ''>], [<URLResolver <URLPattern list> (admin:admin) 'admin/'>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'plitki/get/' [name='user']>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'plitki/save/' [name='user']>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'plitki/shared/<str:user>/get/' [name='shared']>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'plitki/copy/' [name='copy']>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'plitki/copy/list/' [name='copy']>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'gate/data/' [name='gate']>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'gate/callback/' [name='gate']>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'plitki/logs/callback/' [name='logs']>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'plitki/logs/list/' [name='logs']>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'plitki/logs/view/' [name='logs']>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'users/settings/'>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'users/getcsrftoken/'>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'users/login/'>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'users/logout/'>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'users/session/'>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'users/whoami/'>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'users/list/'>], [<URLResolver <module 'plitki.urls' from '/plitki-backend/app/plitki/urls.py'> (None:None) 'api/'>, <URLPattern 'users/shared/'>]], 'path': 'api/plitki/get'}
 
-await fetch("http://localhost:8001/api/plitki/copy/", {
-  "headers": {
-    "accept": "application/json, text/plain, */*",
-    "accept-language": "ru,en;q=0.9,en-GB;q=0.8,en-US;q=0.7",
-    "content-type": "application/json",
-    "sec-ch-ua": "\"Not(A:Brand\";v=\"99\", \"Microsoft Edge\";v=\"133\", \"Chromium\";v=\"133\"",
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "\"Windows\"",
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site",
-    "x-csrftoken": csrf
-  },
-  "referrer": "http://localhost:4201/",
-  "referrerPolicy": "strict-origin-when-cross-origin",
-  "body": "{\"copyFrom\":\"ruzhinskimv@krw.oao.rzd\",\"copyTo\":\"ivc_shtelmahva@krw.oao.rzd\",\"autoCopy\":false,\"idTab\":0}",
-  "method": "POST",
-  "mode": "cors",
-  "credentials": "include"
-});
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/venv/lib/python3.12/site-packages/django/template/base.py", line 883, in _resolve_lookup
+    current = current[bit]
+              ~~~~~~~^^^^^
+TypeError: 'URLResolver' object is not subscriptable
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/venv/lib/python3.12/site-packages/django/template/base.py", line 893, in _resolve_lookup
+    current = getattr(current, bit)
+              ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'URLResolver' object has no attribute 'name'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/venv/lib/python3.12/site-packages/django/template/base.py", line 899, in _resolve_lookup
+    current = current[int(bit)]
+                      ^^^^^^^^
+ValueError: invalid literal for int() with base 10: 'name'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/venv/lib/python3.12/site-packages/django/template/base.py", line 906, in _resolve_lookup
+    raise VariableDoesNotExist(
+django.template.base.VariableDoesNotExist: Failed lookup for key [name] in <URLResolver <URLPattern list> (admin:admin) 'admin/'>
+INFO "GET /api/plitki/get HTTP/1.1" 301 0
+INFO "OPTIONS /api/plitki/get/ HTTP/1.1" 200 0
+DEBUG (0.001) SELECT "django_session"."session_key", "django_session"."session_data", "django_session"."expire_date" FROM "django_session" WHERE ("django_session"."expire_date" > '2025-03-12 08:30:16.314015' AND "django_session"."session_key" = 'kw3d250gy846qaoecvj0dwz1rcegoays') LIMIT 21; args=('2025-03-12 08:30:16.314015', 'kw3d250gy846qaoecvj0dwz1rcegoays'); alias=default
+DEBUG (0.000) SELECT "auth_user"."id", "auth_user"."password", "auth_user"."last_login", "auth_user"."is_superuser", "auth_user"."username", "auth_user"."first_name", "auth_user"."last_name", "auth_user"."email", "auth_user"."is_staff", "auth_user"."is_active", "auth_user"."date_joined" FROM "auth_user" WHERE "auth_user"."id" = 41 LIMIT 21; args=(41,); alias=default
+DEBUG (0.001) SELECT "plitki_link"."id", "plitki_link"."user_id", "plitki_link"."w", "plitki_link"."h", "plitki_link"."dashboardX", "plitki_link"."y", "plitki_link"."color", "plitki_link"."border", "plitki_link"."font", "plitki_link"."title", "plitki_link"."idTab", "plitki_link"."description", "plitki_link"."url", "plitki_link"."inFolder_id", "plitki_link"."gateFileHash", "plitki_link"."gateCheckFile" FROM "plitki_link" WHERE ("plitki_link"."inFolder_id" IS NULL AND "plitki_link"."user_id" = 41); args=(41,); alias=default
+DEBUG (0.000) SELECT "plitki_folder"."id", "plitki_folder"."user_id", "plitki_folder"."w", "plitki_folder"."h", "plitki_folder"."dashboardX", "plitki_folder"."y", "plitki_folder"."color", "plitki_folder"."border", "plitki_folder"."font", "plitki_folder"."title", "plitki_folder"."idTab", "plitki_folder"."description", "plitki_folder"."inFolder_id" FROM "plitki_folder" WHERE ("plitki_folder"."inFolder_id" IS NULL AND "plitki_folder"."user_id" = 41); args=(41,); alias=default
+INFO "GET /api/plitki/get/ HTTP/1.1" 200 102
+INFO "GET /api/users/getcsrftoken/ HTTP/1.1" 200 92
+INFO "OPTIONS /api/gate/data/ HTTP/1.1" 200 0
+DEBUG (0.001) SELECT "django_session"."session_key", "django_session"."session_data", "django_session"."expire_date" FROM "django_session" WHERE ("django_session"."expire_date" > '2025-03-12 08:30:16.431274' AND "django_session"."session_key" = 'kw3d250gy846qaoecvj0dwz1rcegoays') LIMIT 21; args=('2025-03-12 08:30:16.431274', 'kw3d250gy846qaoecvj0dwz1rcegoays'); alias=default
+DEBUG (0.000) SELECT "auth_user"."id", "auth_user"."password", "auth_user"."last_login", "auth_user"."is_superuser", "auth_user"."username", "auth_user"."first_name", "auth_user"."last_name", "auth_user"."email", "auth_user"."is_staff", "auth_user"."is_active", "auth_user"."date_joined" FROM "auth_user" WHERE "auth_user"."id" = 41 LIMIT 21; args=(41,); alias=default
+INFO "POST /api/gate/data/ HTTP/1.1" 200 43
