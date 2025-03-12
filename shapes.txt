@@ -1,28 +1,24 @@
-функция на фронте 
-async profileCopy(copyFrom: string, copyTo: string, autoCopy: boolean, idTab: number) {
-    let url = `${import.meta.env.NG_APP_API_URL}/plitki/copy/`
-    return axios.post(url, {"copyFrom": copyFrom, "copyTo": copyTo, "autoCopy": autoCopy, "idTab": idTab},
-      {
-        headers: {
-          "X-CSRFToken": await this.backend.getcsrftoken()
-        },
-        withCredentials: true
-      })
-      .then((response: any) => {
-        return response.data
-      })
-      .catch((error: any) => {
-        return {"error": "Ошибка получения данных с сервера"}
-      });
-  }
-запрос который будет отправляться 
-вот другое 
-submitCopy() {
-    this.plitkiService.profileCopy(this.copyUserFrom!, this.copyUserTo!, this.autoCopy, 0).then( data => {
-      this.showCopyAccept = false
-      if (data.error)
-        this.notifications.showError(data.error)
-      else
-        this.notifications.showNotification(data.detail)
-    })
-  }
+def CreateDeleteOrUpdateRecords(model, user, data, folder):
+    # Поиск уже созданных значений в конкретной папке
+    existingRecordsDict = {record.id: record for record in model.objects.filter(user=user, inFolder=folder).in_bulk().values()}
+    for item in data:
+        item.pop('added', None)
+        item.pop('gateFileHash', None)
+        item.pop('gateFileUpdated', None)
+        item.pop('x', None)
+        if "new" in item['id']:
+            item.pop('id', None)
+            item['user'] = user
+            item['inFolder'] = folder
+            model.objects.create(**item)
+        else:
+            id = int(item['id'].split('-')[-1])
+            item.pop('id', None)
+            record = existingRecordsDict[id]
+            for field, value in item.items():
+                setattr(record, field, value)
+            record.save()
+            del existingRecordsDict[id]
+    # Удаление оставшихся элементов из БД, если они не были обновлены
+    for id in existingRecordsDict:
+        existingRecordsDict[id].delete()
