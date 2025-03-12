@@ -1,25 +1,4 @@
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def ProfileCopy(request):
-    if request.user.is_staff:
-        try:
-            userFrom = User.objects.get(username=request.data['copyFrom'])
-            userTo = User.objects.get(username=request.data['copyTo'])
-            idTab = request.data['idTab']#добавлен idTab 
-            
-            if idTab is None:
-                return JsonResponse({'error': 'idTab не передан в запросе'})#добавлен idTab 
-            copy_profile(userTo, userFrom, idTab)
-
-            
-            if request.data['autoCopy']:
-                try:
-                    AutoCopyTask.objects.create(userFrom=userFrom, userTo=userTo)
-                except:
-                    return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован, но задача для "{userTo.last_name} {userTo.first_name}" уже существует',
-                    'idTab': idTab})#добавлен idTab 
-
-            return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован', 'idTab':idTab})#добавлен idTab 
-        except Exception as e:
-            return JsonResponse({'error': f'Ошибка: {e}'}) 
-    return JsonResponse({'error': f'Отказано'})
+DEBUG (0.000) SELECT "plitki_link"."id", "plitki_link"."user_id", "plitki_link"."w", "plitki_link"."h", "plitki_link"."dashboardX", "plitki_link"."y", "plitki_link"."color", "plitki_link"."border", "plitki_link"."font", "plitki_link"."title", "plitki_link"."idTab", "plitki_link"."description", "plitki_link"."url", "plitki_link"."inFolder_id", "plitki_link"."gateFileHash", "plitki_link"."gateCheckFile" FROM "plitki_link" WHERE ("plitki_link"."inFolder_id" IS NULL AND "plitki_link"."user_id" = 41); args=(41,); alias=default
+DEBUG (0.000) SELECT "plitki_folder"."id", "plitki_folder"."user_id", "plitki_folder"."w", "plitki_folder"."h", "plitki_folder"."dashboardX", "plitki_folder"."y", "plitki_folder"."color", "plitki_folder"."border", "plitki_folder"."font", "plitki_folder"."title", "plitki_folder"."idTab", "plitki_folder"."description", "plitki_folder"."inFolder_id" FROM "plitki_folder" WHERE ("plitki_folder"."inFolder_id" IS NULL AND "plitki_folder"."user_id" = 41); args=(41,); alias=default
+DEBUG (0.000) SELECT "plitki_link"."id", "plitki_link"."user_id", "plitki_link"."w", "plitki_link"."h", "plitki_link"."dashboardX", "plitki_link"."y", "plitki_link"."color", "plitki_link"."border", "plitki_link"."font", "plitki_link"."title", "plitki_link"."idTab", "plitki_link"."description", "plitki_link"."url", "plitki_link"."inFolder_id", "plitki_link"."gateFileHash", "plitki_link"."gateCheckFile" FROM "plitki_link" WHERE ("plitki_link"."inFolder_id" IS NULL AND "plitki_link"."user_id" = 41); args=(41,); alias=default
+DEBUG (0.000) SELECT "plitki_folder"."id", "plitki_folder"."user_id", "plitki_folder"."w", "plitki_folder"."h", "plitki_folder"."dashboardX", "plitki_folder"."y", "plitki_folder"."color", "plitki_folder"."border", "plitki_folder"."font", "plitki_folder"."title", "plitki_folder"."idTab", "plitki_folder"."description", "plitki_folder"."inFolder_id" FROM "plitki_folder" WHERE ("plitki_folder"."inFolder_id" IS NULL AND "plitki_folder"."user_id" = 41); args=(41,); alias=default
