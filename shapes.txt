@@ -1,16 +1,36 @@
-async profileCopy(copyFrom: string, copyTo: string, autoCopy: boolean, idTab: number) {
-    let url = `${import.meta.env.NG_APP_API_URL}/plitki/copy/`
-    return axios.post(url, {"copyFrom": copyFrom, "copyTo": copyTo, "autoCopy": autoCopy, "idTab": idTab},
-      {
-        headers: {
-          "X-CSRFToken": await this.backend.getcsrftoken()
-        },
-        withCredentials: true
-      })
-      .then((response: any) => {
-        return response.data
-      })
-      .catch((error: any) => {
-        return {"error": "Ошибка получения данных с сервера"}
-      });
-  }
+def __SaveFolderStructure(folderFrom, folderTo, userFrom, userTo,):
+    for link in Link.objects.filter(inFolder=folderFrom, user=userFrom,):
+        link.pk = None
+        link.inFolder = folderTo
+        link.user = userTo
+        with transaction.atomic():
+            link.save()
+    for child in Folder.objects.filter(inFolder=folderFrom, user=userFrom):
+        child.idTab = 0
+        folderFrom = deepcopy(child)
+        child.pk = None
+        child.inFolder = folderTo
+        child.user = userTo
+        with transaction.atomic():
+            child.save()
+        __SaveFolderStructure(folderFrom, child, userFrom, userTo,)
+
+def copy_profile(userTo, userFrom, idTab):
+    Link.objects.filter(user=userTo).delete()
+    Folder.objects.filter(user=userTo).delete()
+    for link in Link.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
+        link.idTab = 0
+        link.pk = None
+        link.user = userTo
+        link.inFolder = None
+        with transaction.atomic():
+            link.save()
+    for folder in Folder.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
+        folder.idTab = 0
+        folderFrom = deepcopy(folder)
+        folder.pk = None
+        folder.user = userTo
+        folder.inFolder = None
+        with transaction.atomic():
+            folder.save()
+        __SaveFolderStructure(folderFrom, folder, userFrom, userTo, idTab)
