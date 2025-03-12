@@ -1,35 +1,16 @@
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def ProfileCopy(request):
-    if request.user.is_staff:
-        try:
-            # Извлекаем данные из запроса
-            userFrom = User.objects.get(username=request.data['copyFrom'])
-            userTo = User.objects.get(username=request.data['copyTo'])
-            idTab = request.data.get('idTab', None)  # Получаем idTab, если он передан
-            
-            if idTab is None:
-                return JsonResponse({'error': 'IDTab не передан в запросе.'})
-
-            # Копирование профиля
-            copy_profile(userTo, userFrom)
-            
-            if request.data['autoCopy']:
-                try:
-                    AutoCopyTask.objects.create(userFrom=userFrom, userTo=userTo)
-                except:
-                    return JsonResponse({
-                        'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован, но задача для "{userTo.last_name} {userTo.first_name}" уже существует',
-                        'idTab': idTab  # Возвращаем idTab для подтверждения
-                    }) 
-
-            # Успешное завершение операции
-            return JsonResponse({
-                'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован',
-                'idTab': idTab  # Возвращаем idTab
-            }) 
-            
-        except Exception as e:
-            return JsonResponse({'error': f'Ошибка: {e}'})
-    
-    return JsonResponse({'error': 'Отказано'})
+async profileCopy(copyFrom: string, copyTo: string, autoCopy: boolean, idTab: number) {
+    let url = `${import.meta.env.NG_APP_API_URL}/plitki/copy/`
+    return axios.post(url, {"copyFrom": copyFrom, "copyTo": copyTo, "autoCopy": autoCopy, "idTab": idTab},
+      {
+        headers: {
+          "X-CSRFToken": await this.backend.getcsrftoken()
+        },
+        withCredentials: true
+      })
+      .then((response: any) => {
+        return response.data
+      })
+      .catch((error: any) => {
+        return {"error": "Ошибка получения данных с сервера"}
+      });
+  }
