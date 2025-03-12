@@ -1,36 +1,25 @@
-def __SaveFolderStructure(folderFrom, folderTo, userFrom, userTo,):
-    for link in Link.objects.filter(inFolder=folderFrom, user=userFrom,):
-        link.pk = None
-        link.inFolder = folderTo
-        link.user = userTo
-        with transaction.atomic():
-            link.save()
-    for child in Folder.objects.filter(inFolder=folderFrom, user=userFrom):
-        child.idTab = 0
-        folderFrom = deepcopy(child)
-        child.pk = None
-        child.inFolder = folderTo
-        child.user = userTo
-        with transaction.atomic():
-            child.save()
-        __SaveFolderStructure(folderFrom, child, userFrom, userTo,)
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def ProfileCopy(request):
+    if request.user.is_staff:
+        try:
+            userFrom = User.objects.get(username=request.data['copyFrom'])
+            userTo = User.objects.get(username=request.data['copyTo'])
+            idTab = request.data.get('idTab', None)#добавлен idTab 
+            
+            if idTab is None:
+                return JsonResponse({'error': 'idTab не передан в запросе'})#добавлен idTab 
+            copy_profile(userTo, userFrom, idTab)
 
-def copy_profile(userTo, userFrom, idTab):
-    Link.objects.filter(user=userTo).delete()
-    Folder.objects.filter(user=userTo).delete()
-    for link in Link.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
-        link.idTab = 0
-        link.pk = None
-        link.user = userTo
-        link.inFolder = None
-        with transaction.atomic():
-            link.save()
-    for folder in Folder.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
-        folder.idTab = 0
-        folderFrom = deepcopy(folder)
-        folder.pk = None
-        folder.user = userTo
-        folder.inFolder = None
-        with transaction.atomic():
-            folder.save()
-        __SaveFolderStructure(folderFrom, folder, userFrom, userTo, idTab)
+            
+            if request.data['autoCopy']:
+                try:
+                    AutoCopyTask.objects.create(userFrom=userFrom, userTo=userTo)
+                except:
+                    return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован, но задача для "{userTo.last_name} {userTo.first_name}" уже существует',
+                    'idTab': idTab})#добавлен idTab 
+
+            return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован', 'idTab':idTab})#добавлен idTab 
+        except Exception as e:
+            return JsonResponse({'error': f'Ошибка: {e}'}) 
+    return JsonResponse({'error': f'Отказано'})
