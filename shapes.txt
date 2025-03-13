@@ -1,5 +1,5 @@
 def copy_profile(userTo, userFrom, idTab):
-    # Удаляем все ссылки и папки для нового пользователя
+    # Удаление всех ссылок и папок для нового пользователя
     Link.objects.filter(user=userTo).delete()
     Folder.objects.filter(user=userTo).delete()
 
@@ -20,13 +20,43 @@ def copy_profile(userTo, userFrom, idTab):
         with transaction.atomic():
             folder.save()  # Сохраняем новую папку
 
-        # Копирование дочерних папок внутри текущей папки
-        for child in Folder.objects.filter(inFolder=folderFrom, user=userFrom, idTab=idTab):
-            child.pk = None  # Обнуляем первичный ключ для новой папки
-            child.inFolder = folder  # Связываем с новой папкой
-            child.user = userTo  # Меняем владельца
-            with transaction.atomic():
-                child.save()  # Сохраняем дочернюю папку
+        # Копирование структуры папок (если есть вложенные папки)
+        __SaveFolderStructure(folderFrom, folder, userFrom, userTo, idTab)
 
-            # Копирование ссылок в дочерней папке
-            for link in Link
+
+def __SaveFolderStructure(folderFrom, folderTo, userFrom, userTo, idTab):
+    # Копирование ссылок, которые находятся в folderFrom и принадлежат userFrom
+    for link in Link.objects.filter(inFolder=folderFrom, user=userFrom, idTab=idTab):
+        link.pk = None  # Обнуляем первичный ключ для создания нового объекта
+        link.inFolder = folderTo  # Связываем с новой папкой
+        link.user = userTo  # Меняем владельца
+        with transaction.atomic():
+            link.save()  # Сохраняем новую ссылку
+
+    # Копирование дочерних папок
+    for child in Folder.objects.filter(inFolder=folderFrom, user=userFrom, idTab=idTab):
+        folderFromCopy = deepcopy(child)  # Создаем копию текущей папки
+        child.pk = None  # Обнуляем первичный ключ для новой папки
+        child.inFolder = folderTo  # Связываем с новой папкой
+        child.user = userTo  # Меняем владельца
+        with transaction.atomic():
+            child.save()  # Сохраняем новую папку
+
+        # Рекурсивно копируем структуру вложенных папок
+        for subfolder in Folder.objects.filter(user=userFrom, idTab=idTab, inFolder=child):
+            subfolder.pk = None
+            subfolder.user = userTo
+            subfolder.inFolder = child
+            with transaction.atomic():
+                subfolder.save()
+
+            # Копируем ссылки в вложенной папке
+            for link in Link.objects.filter(user=userFrom, idTab=idTab, inFolder=subfolder):
+                link.pk = None
+                link.user = userTo
+                link.inFolder = subfolder
+                with transaction.atomic():
+                    link.save()
+
+        # Рекурсивно копируем все вложенные папки и ссылки
+        __SaveFolderStructure(folderFromCopy, child, userFrom, userTo, idTab)
