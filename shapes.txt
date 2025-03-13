@@ -1,62 +1,63 @@
+def __SaveFolderStructure(folderFrom, folderTo, userFrom, userTo, idTab):
+    # Вспомогательная функция для копирования ссылок и папок
+    def copy_links_and_subfolders(links_queryset, folders_queryset):
+        for link in links_queryset:
+            link.pk = None
+            link.user = userTo
+            link.inFolder = folderTo
+            with transaction.atomic():
+                link.save()
+
+        for folder in folders_queryset:
+            folder.pk = None
+            folder.user = userTo
+            folder.inFolder = folderTo
+            with transaction.atomic():
+                folder.save()
+
+            # Рекурсивно копируем вложенные папки
+            __SaveFolderStructure(folder, folder, userFrom, userTo, idTab)
+
+    if idTab == 0:  # Копируем все ссылки и папки для всех idTab
+        copy_links_and_subfolders(Link.objects.filter(user=userFrom, inFolder=folderFrom),
+                                  Folder.objects.filter(user=userFrom, inFolder=folderFrom))
+    elif idTab == 1:  # Копируем ссылки и папки с idTab=1
+        copy_links_and_subfolders(Link.objects.filter(user=userFrom, inFolder=folderFrom, idTab=1),
+                                  Folder.objects.filter(user=userFrom, inFolder=folderFrom, idTab=1))
+    elif idTab == 2:  # Копируем ссылки и папки с idTab=2
+        copy_links_and_subfolders(Link.objects.filter(user=userFrom, inFolder=folderFrom, idTab=2),
+                                  Folder.objects.filter(user=userFrom, inFolder=folderFrom, idTab=2))
+
+
 def copy_profile(userTo, userFrom, idTab):
-    # Удаление всех ссылок и папок для нового пользователя
     Link.objects.filter(user=userTo).delete()
     Folder.objects.filter(user=userTo).delete()
 
-    # Копирование ссылок из исходного пользователя в новый
-    for link in Link.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
-        link.pk = None  # Обнуляем первичный ключ для создания новой записи
-        link.user = userTo  # Меняем владельца
-        link.inFolder = None  # Убираем папку для ссылки
-        with transaction.atomic():
-            link.save()  # Сохраняем новую ссылку
-
-    # Копирование папок из исходного пользователя в новый
-    for folder in Folder.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
-        folderFrom = deepcopy(folder)  # Создаем копию исходной папки
-        folder.pk = None  # Обнуляем первичный ключ для создания новой папки
-        folder.user = userTo  # Меняем владельца
-        folder.inFolder = None  # Убираем связь с папкой
-        with transaction.atomic():
-            folder.save()  # Сохраняем новую папку
-
-        # Копирование структуры папок (если есть вложенные папки)
-        __SaveFolderStructure(folderFrom, folder, userFrom, userTo, idTab)
-
-
-def __SaveFolderStructure(folderFrom, folderTo, userFrom, userTo, idTab):
-    # Копирование ссылок, которые находятся в folderFrom и принадлежат userFrom
-    for link in Link.objects.filter(inFolder=folderFrom, user=userFrom, idTab=idTab):
-        link.pk = None  # Обнуляем первичный ключ для создания нового объекта
-        link.inFolder = folderTo  # Связываем с новой папкой
-        link.user = userTo  # Меняем владельца
-        with transaction.atomic():
-            link.save()  # Сохраняем новую ссылку
-
-    # Копирование дочерних папок
-    for child in Folder.objects.filter(inFolder=folderFrom, user=userFrom, idTab=idTab):
-        folderFromCopy = deepcopy(child)  # Создаем копию текущей папки
-        child.pk = None  # Обнуляем первичный ключ для новой папки
-        child.inFolder = folderTo  # Связываем с новой папкой
-        child.user = userTo  # Меняем владельца
-        with transaction.atomic():
-            child.save()  # Сохраняем новую папку
-
-        # Рекурсивно копируем структуру вложенных папок
-        for subfolder in Folder.objects.filter(user=userFrom, idTab=idTab, inFolder=child):
-            subfolder.pk = None
-            subfolder.user = userTo
-            subfolder.inFolder = child
+    # Вспомогательная функция для копирования ссылок и папок
+    def copy_links_and_folders(links_queryset, folders_queryset):
+        for link in links_queryset:
+            link.pk = None
+            link.user = userTo
+            link.inFolder = None
             with transaction.atomic():
-                subfolder.save()
+                link.save()
 
-            # Копируем ссылки в вложенной папке
-            for link in Link.objects.filter(user=userFrom, idTab=idTab, inFolder=subfolder):
-                link.pk = None
-                link.user = userTo
-                link.inFolder = subfolder
-                with transaction.atomic():
-                    link.save()
+        for folder in folders_queryset:
+            folder.pk = None
+            folder.user = userTo
+            folder.inFolder = None
+            with transaction.atomic():
+                folder.save()
+            __SaveFolderStructure(folder, folder, userFrom, userTo, idTab)
 
-        # Рекурсивно копируем все вложенные папки и ссылки
-        __SaveFolderStructure(folderFromCopy, child, userFrom, userTo, idTab)
+    if idTab == 0:  # Копирование всех данных
+        # Копируем все ссылки и папки для всех idTab
+        copy_links_and_folders(Link.objects.filter(user=userFrom), Folder.objects.filter(user=userFrom))
+
+    elif idTab == 1:  # Копирование только для idTab=1
+        # Копируем только ссылки и папки с idTab=1
+        copy_links_and_folders(Link.objects.filter(user=userFrom, idTab=1), Folder.objects.filter(user=userFrom, idTab=1))
+
+    elif idTab == 2:  # Копирование только для idTab=2
+        # Копируем только ссылки и папки с idTab=2
+        copy_links_and_folders(Link.objects.filter(user=userFrom, idTab=2), Folder.objects.filter(user=userFrom, idTab=2))
