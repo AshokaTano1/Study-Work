@@ -1,18 +1,32 @@
-def __SaveFolderStructure(folderFrom, folderTo, userFrom, userTo):
-    for link in Link.objects.filter(inFolder=folderFrom, user=userFrom,):
-        link.pk = None
-        link.inFolder = folderTo
-        link.user = userTo
-        # link.idTab = 0
+def copy_profile(userTo, userFrom, idTab):
+    # Удаляем все ссылки и папки для нового пользователя
+    Link.objects.filter(user=userTo).delete()
+    Folder.objects.filter(user=userTo).delete()
+
+    # Копирование ссылок из исходного пользователя в новый
+    for link in Link.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
+        link.pk = None  # Обнуляем первичный ключ для создания новой записи
+        link.user = userTo  # Меняем владельца
+        link.inFolder = None  # Убираем папку для ссылки
         with transaction.atomic():
-            link.save()
-    for child in Folder.objects.filter(inFolder=folderFrom, user=userFrom):
-        
-        folderFrom = deepcopy(child)
-        child.pk = None
-        child.inFolder = folderTo
-        child.user = userTo
-        # child.idTab = 0
+            link.save()  # Сохраняем новую ссылку
+
+    # Копирование папок из исходного пользователя в новый
+    for folder in Folder.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
+        folderFrom = deepcopy(folder)  # Создаем копию исходной папки
+        folder.pk = None  # Обнуляем первичный ключ для создания новой папки
+        folder.user = userTo  # Меняем владельца
+        folder.inFolder = None  # Убираем связь с папкой
         with transaction.atomic():
-            child.save()
-        __SaveFolderStructure(folderFrom, child, userFrom, userTo)
+            folder.save()  # Сохраняем новую папку
+
+        # Копирование дочерних папок внутри текущей папки
+        for child in Folder.objects.filter(inFolder=folderFrom, user=userFrom, idTab=idTab):
+            child.pk = None  # Обнуляем первичный ключ для новой папки
+            child.inFolder = folder  # Связываем с новой папкой
+            child.user = userTo  # Меняем владельца
+            with transaction.atomic():
+                child.save()  # Сохраняем дочернюю папку
+
+            # Копирование ссылок в дочерней папке
+            for link in Link
