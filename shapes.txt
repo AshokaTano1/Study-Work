@@ -1,63 +1,152 @@
-def __SaveFolderStructure(folderFrom, folderTo, userFrom, userTo, idTab):
-    # Вспомогательная функция для копирования ссылок и папок
-    def copy_links_and_subfolders(links_queryset, folders_queryset):
-        for link in links_queryset:
-            link.pk = None
-            link.user = userTo
-            link.inFolder = folderTo
-            with transaction.atomic():
-                link.save()
+### Техническое задание (ТЗ)
 
-        for folder in folders_queryset:
-            folder.pk = None
-            folder.user = userTo
-            folder.inFolder = folderTo
-            with transaction.atomic():
-                folder.save()
+#### Для заказчика:
+Цель проекта: реализовать механизм копирования профилей пользователей с учетом вкладок, содержащих плитки. Плитки организованы в виде папок или ссылок и могут быть отфильтрованы по вкладкам.
 
-            # Рекурсивно копируем вложенные папки
-            __SaveFolderStructure(folder, folder, userFrom, userTo, idTab)
+---
 
-    if idTab == 0:  # Копируем все ссылки и папки для всех idTab
-        copy_links_and_subfolders(Link.objects.filter(user=userFrom, inFolder=folderFrom),
-                                  Folder.objects.filter(user=userFrom, inFolder=folderFrom))
-    elif idTab == 1:  # Копируем ссылки и папки с idTab=1
-        copy_links_and_subfolders(Link.objects.filter(user=userFrom, inFolder=folderFrom, idTab=1),
-                                  Folder.objects.filter(user=userFrom, inFolder=folderFrom, idTab=1))
-    elif idTab == 2:  # Копируем ссылки и папки с idTab=2
-        copy_links_and_subfolders(Link.objects.filter(user=userFrom, inFolder=folderFrom, idTab=2),
-                                  Folder.objects.filter(user=userFrom, inFolder=folderFrom, idTab=2))
+### Основные требования:
 
+1. **Профиль пользователя**:
+   - Профиль содержит набор плиток (папок или ссылок).
+   - Внутри профиля добавлено новое представление — **вкладки**.
+   - Вкладка представляет собой подпрофиль с собственной коллекцией плиток.
 
-def copy_profile(userTo, userFrom, idTab):
-    Link.objects.filter(user=userTo).delete()
-    Folder.objects.filter(user=userTo).delete()
+2. **Вкладки**:
+   - Вкладки именуются как `Н` и `НЗ-1`.
+   - Каждая плитка внутри профиля привязана к одной из вкладок через значение `idx`.
 
-    # Вспомогательная функция для копирования ссылок и папок
-    def copy_links_and_folders(links_queryset, folders_queryset):
-        for link in links_queryset:
-            link.pk = None
-            link.user = userTo
-            link.inFolder = None
-            with transaction.atomic():
-                link.save()
+3. **Копирование профилей**:
+   - Реализовать функционал копирования профилей между пользователями.
+   - При копировании добавить возможность выбора вкладки для копирования:
+     - Если выбрана `Н`, копируются только плитки с `idTab: 1`.
+     - Если выбрана `НЗ-1`, копируются только плитки с `idTab: 2`.
+     - Если не выбрана ни одна вкладка (`idTab: 0`), копируются плитки обеих вкладок.
 
-        for folder in folders_queryset:
-            folder.pk = None
-            folder.user = userTo
-            folder.inFolder = None
-            with transaction.atomic():
-                folder.save()
-            __SaveFolderStructure(folder, folder, userFrom, userTo, idTab)
+4. **Переключение между вкладками**:
+   - На интерфейсе пользователя должен быть механизм переключения между вкладками.
+   - При выборе вкладки отображаются только соответствующие плитки (фильтрация по `idx`).
 
-    if idTab == 0:  # Копирование всех данных
-        # Копируем все ссылки и папки для всех idTab
-        copy_links_and_folders(Link.objects.filter(user=userFrom), Folder.objects.filter(user=userFrom))
+5. **Интерфейс копирования**:
+   - Добавить поле выбора вкладки при копировании профиля:
+     - Выбор между `Н`, `НЗ-1` или `Все вкладки`.
+     - Если поле не заполнено, копируются все вкладки (`idTab: 0`).
 
-    elif idTab == 1:  # Копирование только для idTab=1
-        # Копируем только ссылки и папки с idTab=1
-        copy_links_and_folders(Link.objects.filter(user=userFrom, idTab=1), Folder.objects.filter(user=userFrom, idTab=1))
+6. **Отображение плиток**:
+   - При выборе вкладки на экран выводятся только плитки, соответствующие выбранной вкладке (`idTab: 1` или `idTab: 2`).
 
-    elif idTab == 2:  # Копирование только для idTab=2
-        # Копируем только ссылки и папки с idTab=2
-        copy_links_and_folders(Link.objects.filter(user=userFrom, idTab=2), Folder.objects.filter(user=userFrom, idTab=2))
+---
+
+### Для программиста:
+
+#### 1. Примеры и шаблоны структуры данных (только пример!):
+- **Профиль пользователя**:
+  ```json
+  {
+    "userId": "user123",
+    "profileName": "Profile Name",
+    "tabs": [
+      {
+        "idTab": 1,
+        "tabName": "Н",
+        "tiles": [
+          { "tileId": "t1", "type": "folder", "content": "Folder 1" },
+          { "tileId": "t2", "type": "link", "content": "Link 1" }
+        ]
+      },
+      {
+        "idTab": 2,
+        "tabName": "НЗ-1",
+        "tiles": [
+          { "tileId": "t3", "type": "folder", "content": "Folder 2" },
+          { "tileId": "t4", "type": "link", "content": "Link 2" }
+        ]
+      }
+    ]
+  }
+  ```
+
+- **Параметры копирования (только пример!)**:
+  ```json
+  {
+    "sourceUserId": "user123",
+    "targetUserId": "user456",
+    "selectedTab": 0 // 0 = все вкладки, 1 = Н, 2 = НЗ-1
+  }
+  ```
+
+#### 2. Логика работы:
+- **Копирование профилей**:
+  - Если `selectedTab === 0`, копируются все плитки из обеих вкладок.
+  - Если `selectedTab === 1`, копируются только плитки с `idTab === 1`.
+  - Если `selectedTab === 2`, копируются только плитки с `idTab === 2`.
+
+- **Фильтрация плиток (только пример!)**:
+  - При выборе вкладки на интерфейсе пользователя фильтруйте коллекцию плиток по значению `idTab`:
+    ```javascript
+    const filteredTiles = profile.tabs
+      .find(tab => tab.idTab === selectedTab)
+      ?.tiles || [];
+    ```
+
+- **Переключение вкладок**:
+  - Реализуйте переключатель вкладок на интерфейсе (например, радиокнопки или табы).
+  - При выборе вкладки обновите отображаемую коллекцию плиток.
+
+#### 3. Интерфейс копирования:
+- К существующей форме копирования с полями:
+  - Поле выбора источника (`sourceUserId`).
+  - Поле выбора цели (`targetUserId`).
+- Добавить:
+  - Поле выбора вкладки (`selectedTab`):
+    - Значения: `Все вкладки`, `Н`, `НЗ-1`.
+    - По умолчанию: `Все вкладки`.
+
+#### 4. Бэкенд (только пример!):
+- Реализуйте API для копирования профилей:
+  - Метод: `POST /api/copy-profile`
+  - Тело запроса:
+    ```json
+    {
+      "sourceUserId": "user123",
+      "targetUserId": "user456",
+      "selectedTab": 0
+    }
+    ```
+  - Ответ:
+    ```json
+    {
+      "success": true,
+      "message": "Профиль успешно скопирован"
+    }
+    ```
+
+#### 5. Фронтенд:
+- Реализуйте интерфейс управления профилями:
+  - Список профилей с возможностью редактирования и удаления.
+  - Переключение между вкладками.
+  - Форма копирования профилей.
+
+---
+
+### Пример использования:
+
+1. **Скопировать все вкладки**:
+   - Выберите источник и цель.
+   - Оставьте поле выбора вкладки пустым (`selectedTab = 0`).
+
+2. **Скопировать только `Н`**:
+   - Укажите источник и цель.
+   - Выберите `Н` в поле выбора вкладки (`selectedTab = 1`).
+
+3. **Переключение между вкладками**:
+   - На интерфейсе пользователя выберите `Н` или `НЗ-1`.
+   - Отобразятся только соответствующие плитки.
+
+---
+
+### Итог:
+Реализация данного функционала позволит пользователям удобно управлять профилями и вкладками, а также гибко копировать данные между профилями. 
+
+**Статус:** ТЗ готово.  
+**Ожидаемый результат:** Полностью работающий механизм копирования профилей с учетом вкладок.
