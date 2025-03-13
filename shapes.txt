@@ -1,32 +1,19 @@
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def ProfileCopy(request):
-    if request.user.is_staff:
-        try:
-            userFrom = User.objects.get(username=request.data['copyFrom'])
-            userTo = User.objects.get(username=request.data['copyTo'])
-            idTab = request.data['idTab']#добавлен idTab 
-            
-            if idTab is None:
-                logger.error("idTab не передан в запросе")
-                return JsonResponse({'error': 'idTab не передан в запросе'})#добавлен idTab 
-            logger.info(f"Копирование профиля от {userFrom.username} к {userTo.username} с idTab={idTab}")
-            copy_profile(userTo, userFrom, idTab)
-            logger.info("Копирование профиля успешно")
-
-            
-            if request.data['autoCopy']:
-                try:
-                    AutoCopyTask.objects.create(userFrom=userFrom, userTo=userTo)
-                    logger.info(f"Задача AutoCopyTask успешно создана для {userTo.username}")
-                except:
-                    logger.warning(f"Задача для пользователя {userTo.username} уже существует")
-                    return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован, но задача для "{userTo.last_name} {userTo.first_name}" уже существует',
-                    'idTab': idTab})#добавлен idTab 
-
-            return JsonResponse({'detail': f'Профиль "{userFrom.last_name} {userFrom.first_name}" успешно скопирован', 'idTab':idTab})#добавлен idTab 
-        except Exception as e:
-            logger.error(f"Ошибка при копирвоании профиля {e}")
-            return JsonResponse({'error': f'Ошибка: {e}'}) 
-    logger.warning("Отказано в доступе")
-    return JsonResponse({'error': f'Отказано'})
+def copy_profile(userTo, userFrom, idTab):
+    Link.objects.filter(user=userTo).delete()
+    Folder.objects.filter(user=userTo).delete()
+    for link in Link.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
+        # link.idTab = idTab
+        link.pk = None
+        link.user = userTo
+        link.inFolder = None
+        with transaction.atomic():
+            link.save()
+    for folder in Folder.objects.filter(inFolder=None, user=userFrom, idTab=idTab):
+        # folder.idTab = idTab
+        folderFrom = deepcopy(folder)
+        folder.pk = None
+        folder.user = userTo
+        folder.inFolder = None
+        with transaction.atomic():
+            folder.save()
+        __SaveFolderStructure(folderFrom, folder, userFrom, userTo)
